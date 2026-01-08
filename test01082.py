@@ -7,8 +7,8 @@ import os
 import requests
 from bs4 import BeautifulSoup
 
-# --- 1. 頁面配置與黑底白字樣式自定義 ---
-st.set_page_config(page_title="全球資產即時監控", layout="wide", page_icon="🏛️")
+# --- 1. 頁面配置與樣式自定義 ---
+st.set_page_config(page_title="你說說看啊~", layout="wide", page_icon="🏛️")
 
 st.markdown("""
     <style>
@@ -27,6 +27,14 @@ st.markdown("""
     .top-metric-label { font-size: 1rem; color: #b0b0b0; margin-bottom: 10px; }
     .top-metric-value { font-size: 1.8rem; font-weight: 700; color: #ffffff; }
     .top-metric-delta { font-size: 1.1rem; margin-top: 5px; }
+
+    /* 強制將個股展開欄內的 st.metric 數值顏色改為黑色 */
+    [data-testid="stMetricValue"] {
+        color: #000000 !important;
+    }
+    /* 如果您希望下方的百分比變化也維持黑色，可以啟用這行 */
+    /* [data-testid="stMetricDelta"] svg { display: none; } */
+    /* [data-testid="stMetricDelta"] > div { color: #000000 !important; } */
 
     [data-testid="stExpander"] { background-color: #ffffff; border-radius: 10px; margin-bottom: 8px; }
     </style>
@@ -160,33 +168,20 @@ else:
             "損益(TWD)": round(profit, 2), "報酬率": round(roi, 2), "歷史資料": hist_df
         })
 
-    # --- TOP METRICS (黑底白字自定義 HTML) ---
+    # --- TOP METRICS (黑底白字) ---
     t_profit = total_mkt_twd - total_cost_twd
     t_roi = (t_profit / total_cost_twd * 100) if total_cost_twd != 0 else 0
     delta_color = "#00ff00" if t_profit >= 0 else "#ff4b4b"
 
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f"""
-            <div class="top-metric-card">
-                <div class="top-metric-label">💰 總資產市值 (TWD)</div>
-                <div class="top-metric-value">NT$ {total_mkt_twd:,.2f}</div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div class="top-metric-card"><div class="top-metric-label">💰 總資產市值 (TWD)</div><div class="top-metric-value">NT$ {total_mkt_twd:,.2f}</div></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown(f"""
-            <div class="top-metric-card">
-                <div class="top-metric-label">📈 總累計損益</div>
-                <div class="top-metric-value">NT$ {t_profit:,.2f}</div>
-                <div class="top-metric-delta" style="color: {delta_color};">
-                    {'+' if t_profit >= 0 else ''}{t_roi:.2f}%
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div class="top-metric-card"><div class="top-metric-label">📈 總累計損益</div><div class="top-metric-value">NT$ {t_profit:,.2f}</div><div class="top-metric-delta" style="color: {delta_color};">{"+" if t_profit >= 0 else ""}{t_roi:.2f}%</div></div>', unsafe_allow_html=True)
     
     st.divider()
 
-    # 持股明細卡片
+    # --- 個股明細卡片 (重點：損益數值已透過 CSS 強制轉為黑色) ---
     for item in summary_list:
         with st.expander(f"{item['名稱']} ({item['代號']})"):
             c1, c2, c3 = st.columns([1, 2.5, 1.2])
@@ -196,33 +191,25 @@ else:
                     try: st.image(logo_path, width=65)
                     except: st.caption("🏢 (Logo Error)")
                 else: st.caption("🏢 (No Logo)")
-                st.metric("損益", f"{item['損益(TWD)']:,.2f}", f"{item['報酬率']:.2f}%")
+                
+                # 這裡的 "損益" 字體顏色現在會被 CSS 強制設為黑色
+                st.metric("累積損益 (TWD)", f"{item['損益(TWD)']:,.2f}", f"{item['報酬率']:.2f}%")
+                st.caption(f"持股: {item['持股數']} | 幣別: {'TWD' if '.TW' in item['代號'] else 'USD'}")
+            
             with c2:
                 if not item['歷史資料'].empty:
                     fig = go.Figure(data=[go.Candlestick(x=item['歷史資料'].index, open=item['歷史資料']['Open'], high=item['歷史資料']['High'], low=item['歷史資料']['Low'], close=item['歷史資料']['Close'])])
                     fig.update_layout(template="plotly_white", height=180, margin=dict(l=0,r=0,b=0,t=0), xaxis_rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
+            
             with c3:
                 if st.button("🗑️ 刪除", key=f"del_{item['idx']}"):
                     st.session_state.portfolio = st.session_state.portfolio.drop(item['idx'])
                     save_db(st.session_state.portfolio)
                     st.rerun()
 
-    # 底部彙整總表
+    # --- 底部彙整表 ---
     st.divider()
     st.subheader("📊 投資組合彙整總表")
     sum_df = pd.DataFrame(summary_list).drop(columns=['歷史資料', 'idx'])
-    
-    st.dataframe(
-        sum_df, 
-        column_config={
-            "Logo": st.column_config.ImageColumn("標誌", width="small"),
-            "平均成本": st.column_config.NumberColumn(format="%.2f"),
-            "目前市價": st.column_config.NumberColumn(format="%.2f"),
-            "投入金額(TWD)": st.column_config.NumberColumn(format="NT$ %.2f"),
-            "目前價值(TWD)": st.column_config.NumberColumn(format="NT$ %.2f"),
-            "損益(TWD)": st.column_config.NumberColumn(format="NT$ %.2f"),
-            "報酬率": st.column_config.NumberColumn(format="%.2f%%") # 這裡確保了百分比顯示
-        }, 
-        use_container_width=True, hide_index=True
-    )
+    st.dataframe(sum_df, column_config={"Logo": st.column_config.ImageColumn("標誌", width="small"), "報酬率": st.column_config.NumberColumn(format="%.2f%%")}, use_container_width=True, hide_index=True)

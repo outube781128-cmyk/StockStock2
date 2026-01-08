@@ -32,9 +32,6 @@ st.markdown("""
     [data-testid="stMetricValue"] {
         color: #000000 !important;
     }
-    /* 如果您希望下方的百分比變化也維持黑色，可以啟用這行 */
-    /* [data-testid="stMetricDelta"] svg { display: none; } */
-    /* [data-testid="stMetricDelta"] > div { color: #000000 !important; } */
 
     [data-testid="stExpander"] { background-color: #ffffff; border-radius: 10px; margin-bottom: 8px; }
     </style>
@@ -130,10 +127,10 @@ with st.sidebar:
         st.rerun()
 
 # --- 6. 主畫面顯示 ---
-st.title("🛡️ 全球資產監控儀表板")
+st.title("你說說看啊") # 標題已修改
 
 if st.session_state.portfolio.empty:
-    st.info("👋 目前投資組合為空，請從左側新增。")
+    st.info("👋 目前投資組合為空，請從左側新增資產來讓它說說看！")
 else:
     summary_list = []
     total_mkt_twd, total_cost_twd = 0.0, 0.0
@@ -181,7 +178,7 @@ else:
     
     st.divider()
 
-    # --- 個股明細卡片 (重點：損益數值已透過 CSS 強制轉為黑色) ---
+    # --- 個股明細卡片 ---
     for item in summary_list:
         with st.expander(f"{item['名稱']} ({item['代號']})"):
             c1, c2, c3 = st.columns([1, 2.5, 1.2])
@@ -192,9 +189,9 @@ else:
                     except: st.caption("🏢 (Logo Error)")
                 else: st.caption("🏢 (No Logo)")
                 
-                # 這裡的 "損益" 字體顏色現在會被 CSS 強制設為黑色
+                # 個股損益文字已透過 CSS 設為黑色
                 st.metric("累積損益 (TWD)", f"{item['損益(TWD)']:,.2f}", f"{item['報酬率']:.2f}%")
-                st.caption(f"持股: {item['持股數']} | 幣別: {'TWD' if '.TW' in item['代號'] else 'USD'}")
+                st.caption(f"持股: {item['持股數']}")
             
             with c2:
                 if not item['歷史資料'].empty:
@@ -208,9 +205,16 @@ else:
                     save_db(st.session_state.portfolio)
                     st.rerun()
 
-    # --- 底部彙整表 ---
+    # --- 底部彙整總表 ---
     st.divider()
     st.subheader("📊 投資組合彙整總表")
     sum_df = pd.DataFrame(summary_list).drop(columns=['歷史資料', 'idx'])
-    st.dataframe(sum_df, column_config={"Logo": st.column_config.ImageColumn("標誌", width="small"), "報酬率": st.column_config.NumberColumn(format="%.2f%%")}, use_container_width=True, hide_index=True)
-
+    st.dataframe(
+        sum_df, 
+        column_config={
+            "Logo": st.column_config.ImageColumn("標誌", width="small"), 
+            "報酬率": st.column_config.NumberColumn(format="%.2f%%")
+        }, 
+        use_container_width=True, 
+        hide_index=True
+    )
